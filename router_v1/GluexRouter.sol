@@ -51,7 +51,7 @@ contract GluexRouter is EthReceiver {
      * @param protocolShare The share of surplus and slippage given to the GlueX protocol.
      */
     event Routed(
-        bytes indexed uniquePID,
+        bytes32 indexed uniquePID,
         address indexed userAddress,
         address outputReceiver,
         IERC20 inputToken,
@@ -86,7 +86,7 @@ contract GluexRouter is EthReceiver {
         uint256 effectiveOutputAmount; // Effective output amount for the user
         uint256 minOutputAmount; // Minimum acceptable output amount
         bool isPermit2; // Whether to use Permit2 for token transfers
-        bytes uniquePID; // Unique identifier for the partner
+        bytes32 uniquePID; // Unique identifier for the partner
     }
 
     // Struct to handle surplus and slippage calculations and avoid stack too deep
@@ -348,10 +348,14 @@ contract GluexRouter is EthReceiver {
         uint256 finalOutputAmount,
         RouteDescription calldata desc
     ) internal pure returns (uint256 routingFee) {
-        if (finalOutputAmount > desc.effectiveOutputAmount + desc.routingFee) {
-            routingFee = desc.routingFee;
-        } else if (finalOutputAmount > desc.effectiveOutputAmount) {
-            routingFee = finalOutputAmount - desc.effectiveOutputAmount;
+        if (desc.routingFee != 0) {
+            if (finalOutputAmount > desc.effectiveOutputAmount + desc.routingFee) {
+                routingFee = desc.routingFee;
+            } else if (finalOutputAmount > desc.effectiveOutputAmount) {
+                routingFee = finalOutputAmount - desc.effectiveOutputAmount;
+            } else {
+                routingFee = 0;
+            }
         } else {
             routingFee = 0;
         }
@@ -368,16 +372,10 @@ contract GluexRouter is EthReceiver {
         RouteDescription calldata desc
     ) internal pure returns (ShareCalculation memory shares) {
         // Calculate surplus and slippage
-        if (
-            finalOutputAmount >= desc.outputAmount &&
-            desc.outputAmount >= desc.effectiveOutputAmount
-        ) {
+        if (finalOutputAmount >= desc.outputAmount && desc.outputAmount >= desc.effectiveOutputAmount) {
             shares.surplus = desc.outputAmount - desc.effectiveOutputAmount;
             shares.slippage = finalOutputAmount - desc.effectiveOutputAmount;
-        } else if (
-            desc.outputAmount > finalOutputAmount &&
-            finalOutputAmount > desc.effectiveOutputAmount
-        ) {
+        } else if (desc.outputAmount > finalOutputAmount && finalOutputAmount > desc.effectiveOutputAmount) {
             shares.surplus = finalOutputAmount - desc.effectiveOutputAmount;
             shares.slippage = 0;
         } else {
@@ -407,11 +405,16 @@ contract GluexRouter is EthReceiver {
         ShareCalculation memory shares
     ) internal {
         if (shares.partnerShare != 0) {
-            uniTransfer(
-                desc.outputToken,
-                desc.partnerAddress,
-                shares.partnerShare
-            );
+            if (desc.partnerAddress != address(0)) {
+                uniTransfer(
+                    desc.outputToken,
+                    desc.partnerAddress,
+                    shares.partnerShare
+                );
+            } else {
+                // If no partner address, add to protocol share
+                shares.protocolShare += shares.partnerShare;
+            }
         }
 
         if (shares.protocolShare != 0) {
