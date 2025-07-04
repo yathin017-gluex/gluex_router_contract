@@ -203,14 +203,16 @@ contract GluexRouter is EthReceiver {
         // Calculate final output amount
         uint256 partnerFee = desc.partnerFee;
         uint256 routingFee = 0;
-        if (finalOutputAmount > desc.effectiveOutputAmount + desc.routingFee) {
-            finalOutputAmount = finalOutputAmount - desc.routingFee;
-            routingFee = desc.routingFee;
-        } else if (finalOutputAmount > desc.effectiveOutputAmount) {
-            routingFee = finalOutputAmount - desc.effectiveOutputAmount;
-            finalOutputAmount = desc.effectiveOutputAmount;
-        } else {
-            finalOutputAmount = finalOutputAmount;
+        if (desc.routingFee != 0) {
+            if (finalOutputAmount > desc.effectiveOutputAmount + desc.routingFee) {
+                finalOutputAmount = finalOutputAmount - desc.routingFee;
+                routingFee = desc.routingFee;
+            } else if (finalOutputAmount > desc.effectiveOutputAmount) {
+                routingFee = finalOutputAmount - desc.effectiveOutputAmount;
+                finalOutputAmount = desc.effectiveOutputAmount;
+            } else {
+                finalOutputAmount = finalOutputAmount;
+            }
         }
 
         // Surplus and Slippage calculation
@@ -446,4 +448,29 @@ contract GluexRouter is EthReceiver {
     {        
         _MAX_PARTNER_SLIPPAGE_SHARE_LIMIT = partnerSlippageShareLimit;
     }
+
+    /**
+     * @notice Updates the protocol surplus share limit.
+     * @param protocolSurplusShareLimit The new limit for protocol surplus share.
+     * @dev This function is restricted to the treasury.
+     */
+    function setProtocolSurplusShareLimit(uint256 protocolSurplusShareLimit)
+        external
+        onlyTreasury
+    {
+        _MIN_PROTOCOL_SURPLUS_SHARE_LIMIT = protocolSurplusShareLimit;
+    }
+
+    /**
+     * @notice Updates the protocol slippage share limit.
+     * @param protocolSlippageShareLimit The new limit for protocol slippage share.
+     * @dev This function is restricted to the treasury.
+     */
+    function setProtocolSlippageShareLimit(uint256 protocolSlippageShareLimit)
+        external
+        onlyTreasury
+    {
+        _MIN_PROTOCOL_SLIPPAGE_SHARE_LIMIT = protocolSlippageShareLimit;
+    }
+    
 }
